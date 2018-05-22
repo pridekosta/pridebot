@@ -46,7 +46,7 @@ async function sendDefaultContent(user) {
         kb = Bot.keyboard([[{ text: 'Отправить номер телефона', request_contact: true }]]);
     if (content.orderData[0].kb)
         kb = Bot.keyboard(content.orderData[0].kb);
-    bot.sendMessage(msg.message.chat.id, content.orderData[0].title, kb)
+    bot.sendMessage(user.chatId, content.orderData[0].title, kb)
 }
 
 function applyOrder(task, user) {
