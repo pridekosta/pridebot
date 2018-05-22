@@ -28,15 +28,25 @@ const mailOptions = {
 
 async function sendDefaultContent(user) {
     const content = new Content(user);
-    const ikb = Bot.inlineKeyboard([
-        [{ text: content.actionMsg, callback_data: "CREATE_ORDER" }]
-    ]);
-    let kb = Bot.hideKeyboard()
-    for (let idx = 0; idx < content.initialContent.length; idx++) {
-        const message = content.initialContent[idx];
-        const res = await bot.sendMessage(user.chatId, message,
-            (idx == content.initialContent.length - 1) ? ikb : kb);
-    }
+    // const ikb = Bot.inlineKeyboard([
+    //     [{ text: content.actionMsg, callback_data: "CREATE_ORDER" }]
+    // ]);
+    // let kb = Bot.hideKeyboard()
+    // for (let idx = 0; idx < content.initialContent.length; idx++) {
+    //     const message = content.initialContent[idx];
+    //     const res = await bot.sendMessage(user.chatId, message,
+    //         (idx == content.initialContent.length - 1) ? ikb : kb);
+    // }
+    const prevTask = db.get('task', item => item.user == user.id)
+    if (prevTask) db.delete('task', prevTask.id);
+
+    db.create('task', { user: user.id, type: 'order', request: content.orderData[0].id, info: {} });
+    let kb = Bot.hideKeyboard();
+    if (content.orderData[0].id == 'phone')
+        kb = Bot.keyboard([[{ text: 'Отправить номер телефона', request_contact: true }]]);
+    if (content.orderData[0].kb)
+        kb = Bot.keyboard(content.orderData[0].kb);
+    bot.sendMessage(msg.message.chat.id, content.orderData[0].title, kb)
 }
 
 function applyOrder(task, user) {
@@ -51,7 +61,7 @@ function applyOrder(task, user) {
         'year': 'Год выпуска:',
         'engine': 'Объем двигателя:',
         'phone': 'Номер телефона:',
-        'area': 'Род деятельности:', 
+        'area': 'Род деятельности:',
         'city': 'Город:'
     }
     const subject = subjects[user.type];
@@ -67,7 +77,7 @@ function applyOrder(task, user) {
         if (error) {
             console.log(error);
         } else {
-            bot.sendMessage(user.chatId, Content.orderCreatedMsg, Bot.hideKeyboard())            
+            bot.sendMessage(user.chatId, Content.orderCreatedMsg, Bot.hideKeyboard())
             db.delete('task', task.id);
             db.update('user', user.id, {
                 order_qty: user.order_qty + 1
@@ -139,38 +149,38 @@ bot.on('callback_query', function (msg) {
             bot.sendMessage(msg.message.chat.id, content.orderData[0].title, kb)
             break;
         }
-        case (msg.data.includes('DENY')): {
-            if (!user.admin) return;
-            try {
-                const id = parseInt(msg.data.split('_')[0]);
-                const task = db.get('task', (item) => item.id == id);
-                if (!task) return;
-                db.delete('task', id);
-                const user = db.get('user', (item) => item.id == task.user);
-                if (!user) return;
-                bot.sendMessage(task.chatId, Content.managerNotFoundMsg);
-            } catch (e) {
-                console.log(e);
-            }
-        }
-        case (msg.data.includes('CONNECT')): {
-            if (!user.admin) return;
-            try {
-                const id = parseInt(msg.data.split('_')[0]);
-                const task = db.get('task', (item) => item.id == id);
-                if (!task) return;
-                db.delete('task', id);
-                const u = db.get('user', (item) => item.id == task.user);
-                if (!u) return;
-                db.create('connection', {
-                    admin: user.id,
-                    user: u.id
-                })
-                bot.sendMessage(msg.message.chat.id, "Соеденено", Bot.keyboard([['Стоп']]))
-            } catch (e) {
-                console.log(e);
-            }
-        }
+        // case (msg.data.includes('DENY')): {
+        //     if (!user.admin) return;
+        //     try {
+        //         const id = parseInt(msg.data.split('_')[0]);
+        //         const task = db.get('task', (item) => item.id == id);
+        //         if (!task) return;
+        //         db.delete('task', id);
+        //         const user = db.get('user', (item) => item.id == task.user);
+        //         if (!user) return;
+        //         bot.sendMessage(task.chatId, Content.managerNotFoundMsg);
+        //     } catch (e) {
+        //         console.log(e);
+        //     }
+        // }
+        // case (msg.data.includes('CONNECT')): {
+        //     if (!user.admin) return;
+        //     try {
+        //         const id = parseInt(msg.data.split('_')[0]);
+        //         const task = db.get('task', (item) => item.id == id);
+        //         if (!task) return;
+        //         db.delete('task', id);
+        //         const u = db.get('user', (item) => item.id == task.user);
+        //         if (!u) return;
+        //         db.create('connection', {
+        //             admin: user.id,
+        //             user: u.id
+        //         })
+        //         bot.sendMessage(msg.message.chat.id, "Соеденено", Bot.keyboard([['Стоп']]))
+        //     } catch (e) {
+        //         console.log(e);
+        //     }
+        // }
     }
 });
 
@@ -202,45 +212,45 @@ bot.on('message', (msg) => {
     const connection = db.get('connection', (item) => item.user == user.id || item.admin == user.id);
 
     switch (true) {
-        case (!!connection): {
-            if (user.admin && msg.text == 'Стоп') {
-                db.delete('connection', connection.id);
-                break;
-            }
-            const opositeId = (user.admin) ? connection.user : connection.admin;
-            const opositeUser = db.get('user', (item) => item.id == opositeId);
-            bot.sendMessage(opositeUser.chatId, msg.text);
-            break;
-        }
-        case (!task && !user.admin): {
-            db.create('task', { user: user.id, chatId: msg.chat.id, type: 'connect', message: msg.text });
+        // case (!!connection): {
+        //     if (user.admin && msg.text == 'Стоп') {
+        //         db.delete('connection', connection.id);
+        //         break;
+        //     }
+        //     const opositeId = (user.admin) ? connection.user : connection.admin;
+        //     const opositeUser = db.get('user', (item) => item.id == opositeId);
+        //     bot.sendMessage(opositeUser.chatId, msg.text);
+        //     break;
+        // }
+        // case (!task && !user.admin): {
+        //     db.create('task', { user: user.id, chatId: msg.chat.id, type: 'connect', message: msg.text });
 
-            const keyboard = [['Да', 'Нет']];
-            bot.sendMessage(msg.chat.id, Content.connectMsg, Bot.keyboard(keyboard))
-            break;
-        }
-        case (task && task.type == 'connect' && task.status != 'acepted'): {
-            if (msg.text == 'Нет') {
-                db.delete('task', task.id);
-                bot.sendMessage(msg.chat.id, 'Отменено', Bot.hideKeyboard());
-                return;
-            };
-            if (msg.text == 'Да') {
-                db.update('task', task.id, {
-                    status: 'acepted'
-                })
-                bot.sendMessage(msg.chat.id, Content.waitMsg, Bot.hideKeyboard())
-                const type = Content.userTypes.find(t => t.id == user.type);
-                admins = db.list('user', (item) => item.admin);
-                admins.forEach(admin => {
-                    const kb = [[{ text: "Соеденить", callback_data: `${task.id}_CONNECT` },
-                    { text: "Отказать", callback_data: `${task.id}_DENY` }]]
-                    bot.sendMessage(admin.chatId, `Запрос на соеденение с менеджером:\nИмя - ${msg.from.first_name}\nCтатус - ${type.name}\nСообщение - ${task.message}\n`,
-                        Bot.inlineKeyboard(kb))
-                })
-            }
-            break;
-        }
+        //     const keyboard = [['Да', 'Нет']];
+        //     bot.sendMessage(msg.chat.id, Content.connectMsg, Bot.keyboard(keyboard))
+        //     break;
+        // }
+        // case (task && task.type == 'connect' && task.status != 'acepted'): {
+        //     if (msg.text == 'Нет') {
+        //         db.delete('task', task.id);
+        //         bot.sendMessage(msg.chat.id, 'Отменено', Bot.hideKeyboard());
+        //         return;
+        //     };
+        //     if (msg.text == 'Да') {
+        //         db.update('task', task.id, {
+        //             status: 'acepted'
+        //         })
+        //         bot.sendMessage(msg.chat.id, Content.waitMsg, Bot.hideKeyboard())
+        //         const type = Content.userTypes.find(t => t.id == user.type);
+        //         admins = db.list('user', (item) => item.admin);
+        //         admins.forEach(admin => {
+        //             const kb = [[{ text: "Соеденить", callback_data: `${task.id}_CONNECT` },
+        //             { text: "Отказать", callback_data: `${task.id}_DENY` }]]
+        //             bot.sendMessage(admin.chatId, `Запрос на соеденение с менеджером:\nИмя - ${msg.from.first_name}\nCтатус - ${type.name}\nСообщение - ${task.message}\n`,
+        //                 Bot.inlineKeyboard(kb))
+        //         })
+        //     }
+        //     break;
+        // }
         case (task && task.type == 'order' && !!task.request): {
             task.info[task.request] = msg.text;
             const currentRequest = content.orderData.find(d => d.id == task.request);
