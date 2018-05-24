@@ -105,6 +105,8 @@ bot.onText(/\/savedb/, (msg, match) => {
 bot.onText(/\/setadmin/, (msg, match) => {
     let user = db.get('user', (item) => item.userId == msg.from.id);
     if (!user || !user.admin) return;
+    const prevTask = db.get('task', item => item.user == user.id)
+    if (prevTask) db.delete('task', prevTask.id);
     db.create('task', { type: 'setadmin', user: user.id })
     bot.sendMessage(msg.chat.id, 'Chatid:', Bot.keyboard([['Отмена']]))
 });
@@ -285,6 +287,7 @@ bot.on('message', (msg) => {
             db.update('user', updateUser.id, {
                 admin: !updateUser.admin
             })
+            db.delete('task', task.id);
             bot.sendMessage(msg.chat.id, `Админ статус пользователя ${updateUser.name} - ${!updateUser.admin}`, Bot.hideKeyboard());
         }
         case (task && task.type == 'article' && !!task.request && !!user.admin): {
